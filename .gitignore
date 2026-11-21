@@ -1,0 +1,30 @@
+# === Secrets & Runtime State ===
+service.json
+memory.json
+*.log
+log/
+logs/
+
+# === Package Managers ===
+node_modules/
+package.json
+package-lock.json
+bun.lock
+yarn.lock
+pnpm-lock.yaml
+
+# === Python ===
+venv/
+__pycache__/
+*.pyc
+.venv/
+
+# === Tools (installed deps, not config) ===
+tools/
+
+# === OS Junk ===
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo

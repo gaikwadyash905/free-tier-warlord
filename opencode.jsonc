@@ -1,0 +1,1050 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "orchestrator",
+  "instructions": ["PLAN.md"],
+  // Default model = biggest context window on the trusted NIM provider:
+  // Nemotron 3 Ultra serves 256K ctx on the hosted endpoint (NVIDIA NIM docs,
+  // 2026-06-26; live PONG 2s 2026-11-17). mistral-large-4 is 200K.
+  "model": "nvidia/nemotron-ultra",
+  // v2 native replacement for v1 "small_model": the built-in `title` agent
+  // generates session titles, so point it at the fastest keyless zero-retention
+  // free model (measured 3 s first byte 2026-11-17) instead of the NIM queue.
+  "agents": {
+    "title": {
+      "model": "opencode/hy4-flash-free"
+    }
+  },
+  "share": "disabled",
+  "update": "notify",
+  "snapshots": true,
+  "timezone": "Asia/Kolkata",
+  "formatter": true,
+  "lsp": true,
+  // Cap tool output so huge shell/read results cannot blow the context window
+  // (Codex budgets shell output at ~10k tokens; v2 equivalent is lines+bytes)
+  "tool_output": {
+    "max_lines": 2000,
+    "max_bytes": 51200
+  },
+  "websearch": {
+    "provider": "random"
+  },
+  "watcher": {
+    "ignore": [
+      "**/node_modules/**",
+      "**/target/**",
+      "**/.venv/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/__pycache__/**",
+      "**/.scratch/**",
+      "**/.git/**"
+    ]
+  },
+  // ======================================================================
+  // Provider: NVIDIA NIM free endpoints. modelID = the API id (see /v1/models); the key is only OpenCode's alias. Key comes from /connect or $NVIDIA_API_KEY.
+  "providers": {
+    "nvidia": {
+      "name": "NVIDIA NIM (free endpoints)",
+      "env": [
+        "NVIDIA_API_KEY"
+      ],
+      "package": "@opencode/ai/providers/openai-compatible",
+      "compatibility": {
+        "requireFinishReason": false
+      },
+      "settings": {
+        "baseURL": "https://integrate.api.nvidia.com/v1",
+        "headerTimeout": 600000,
+        "chunkTimeout": 900000,
+        "timeout": 1800000
+      },
+      "models": {
+        "mistral-large-4": {
+          "name": "Mistral Large 4",
+          "modelID": "mistralai/mistral-large-4-1t-a52b",
+          "limit": {
+            "context": 200000,
+            "output": 32768
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ],
+            "reasoning": {
+              "supported": false
+            }
+          }
+        },
+        "glm-5-3-flash": {
+          "name": "GLM-5.3 Flash",
+          "modelID": "z-ai/glm-5.3-flash",
+          "limit": {
+            "context": 200000,
+            "output": 32768
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ],
+            "reasoning": {
+              "supported": false
+            }
+          }
+        },
+        "nemotron-ultra": {
+          "name": "Nemotron 3 Ultra 550B",
+          "modelID": "nvidia/nemotron-3-ultra-550b-a55b",
+          "limit": {
+            // native ctx on the hosted NIM endpoint (docs.nvidia.com/nim 2.0.7, 2026-06-26); 1M only self-hosted
+            "context": 262144,
+            "output": 32768
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ],
+            "reasoning": {
+              "supported": false
+            }
+          }
+        },
+        "deepseek-v4.1-flash": {
+          "name": "DeepSeek V4.1 Flash",
+          "modelID": "deepseek-ai/deepseek-v4.1-flash",
+          // EOL on NIM 2026-11-16T08:00Z (live error 2026-11-17) — kept declared but disabled; use opencode/deepseek-v4.1-flash-free (Zen) instead
+          "disabled": true,
+          "limit": {
+            "context": 1000000,
+            "output": 384000
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        }
+      }
+    },
+    // ======================================================================
+    // Groq (free plan, no card; key: console.groq.com -> GROQ_API_KEY).
+    // Free limits per model: 30 RPM / 1,000 RPD / 8K TPM / 200K TPD (gpt-oss-120b,
+    // gpt-oss-20b, qwen3.8-27b rows verified on console.groq.com/docs/rate-limits,
+    // 2026-11-17). LPU hardware: ~280+ tok/s on llama-3.3-70b, sub-second TTFT.
+    // Bottleneck for agents = 8K TPM (big contexts eat it fast). Use for fast,
+    // small-prompt subagents.
+    "groq": {
+      "name": "Groq (free plan)",
+      "env": [
+        "GROQ_API_KEY"
+      ],
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": {
+        "baseURL": "https://api.groq.com/openai/v1"
+      },
+      "models": {
+        "gpt-oss-120b": {
+          "name": "GPT-OSS 120B (Groq free)",
+          "modelID": "openai/gpt-oss-120b",
+          "limit": {
+            "context": 131072,
+            "output": 65536
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "gpt-oss-20b": {
+          "name": "GPT-OSS 20B (Groq free)",
+          "modelID": "openai/gpt-oss-20b",
+          "limit": {
+            "context": 131072,
+            "output": 65536
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "qwen3.8-27b": {
+          "name": "Qwen 3.8 27B (Groq free)",
+          "modelID": "qwen/qwen3.8-27b",
+          "limit": {
+            "context": 131072,
+            "output": 65536
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "llama-3.3-70b": {
+          "name": "Llama 3.3 70B (Groq free, ~280 tok/s)",
+          "modelID": "llama-3.3-70b-versatile",
+          "limit": {
+            "context": 131072,
+            "output": 32768
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        }
+      }
+    },
+    // ======================================================================
+    // Cloudflare Workers AI (free: 10,000 Neurons/day shared, 300 RPM text gen,
+    // resets 00:00 UTC; developers.cloudflare.com/workers-ai 2026-11-17).
+    // Neuron cost is per model — 10K neurons ~= ~287K output tokens/day on
+    // llama-3.1-8b-fast, less on bigger models. Newest frontier models
+    // (GLM-5.x, DeepSeek V4, Kimi K2.6+) are paid-only. Needs a free CF account:
+    // CLOUDFLARE_API_TOKEN (Workers AI token) + CLOUDFLARE_ACCOUNT_ID.
+    "cloudflare": {
+      "name": "Cloudflare Workers AI (free 10k neurons/day)",
+      "env": [
+        "CLOUDFLARE_API_TOKEN",
+        "CLOUDFLARE_ACCOUNT_ID"
+      ],
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": {
+        "baseURL": "https://api.cloudflare.com/client/v4/accounts/{env:CLOUDFLARE_ACCOUNT_ID}/ai/v1"
+      },
+      "models": {
+        "llama-3.3-70b-fp8-fast": {
+          "name": "Llama 3.3 70B fp8 fast (Workers AI free)",
+          "modelID": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+          "limit": {
+            "context": 131072,
+            "output": 8192
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "gpt-oss-120b": {
+          "name": "GPT-OSS 120B (Workers AI free)",
+          "modelID": "@cf/openai/gpt-oss-120b",
+          "limit": {
+            "context": 131072,
+            "output": 8192
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "gpt-oss-20b": {
+          "name": "GPT-OSS 20B (Workers AI free)",
+          "modelID": "@cf/openai/gpt-oss-20b",
+          "limit": {
+            "context": 131072,
+            "output": 8192
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "qwen3.8-27b": {
+          "name": "Qwen 3.8 27B (Workers AI free)",
+          "modelID": "@cf/qwen/qwen3.8-27b",
+          "limit": {
+            "context": 131072,
+            "output": 8192
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "llama-4-scout": {
+          "name": "Llama 4 Scout 17B (Workers AI free)",
+          "modelID": "@cf/meta/llama-4-scout-17b-16e-instruct",
+          "limit": {
+            "context": 131072,
+            "output": 8192
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        }
+      }
+    },
+    // ======================================================================
+    // OpenRouter `:free` models (free account key: OPENROUTER_API_KEY, no card).
+    // Limits: 20 RPM, 50 requests/day (1,000/day only after buying $10 of credits —
+    // openrouter.ai/docs/api_reference/limits, 2026-11-17). Small daily cap, but
+    // Nemotron 3 Ultra :free has a 1M context — ideal for occasional big-context
+    // verification/research passes, not for hot loops. Provider capacity can 429.
+    "openrouter": {
+      "name": "OpenRouter :free models",
+      "env": [
+        "OPENROUTER_API_KEY"
+      ],
+      "models": {
+        "nemotron-3-ultra-free": {
+          "name": "Nemotron 3 Ultra 550B :free (1M ctx)",
+          "modelID": "nvidia/nemotron-3-ultra-550b-a55b:free",
+          "limit": {
+            "context": 1000000,
+            "output": 32768
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "nemotron-3.5-super-vl-free": {
+          "name": "Nemotron 3.5 Super VL :free (1M ctx, vision)",
+          "modelID": "nvidia/nemotron-3.5-super-vl:free",
+          "limit": {
+            "context": 1000000,
+            "output": 32768
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "nemotron-3-nano-omni-reasoning-free": {
+          "name": "Nemotron 3 Nano Omni 30B A3B Reasoning :free (256K ctx)",
+          "modelID": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "limit": {
+            "context": 256000,
+            "output": 65536
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "nemotron-3.5-lightning-free": {
+          "name": "Nemotron 3.5 Lightning :free (1M ctx)",
+          "modelID": "nvidia/nemotron-3.5-lightning:free",
+          "limit": {
+            "context": 1000000,
+            "output": 65536
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "gemma-4-31b-free": {
+          "name": "Gemma 4 31B :free",
+          "modelID": "google/gemma-4-31b-it:free",
+          "limit": {
+            "context": 262144,
+            "output": 32768
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "free-router": {
+          "name": "openrouter/free router (auto-selects a free model)",
+          "modelID": "openrouter/free",
+          "limit": {
+            "context": 200000,
+            "output": 16384
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        }
+      }
+    },
+    // ======================================================================
+    // Novita AI — rotating $0-priced models (email/GitHub signup, no card).
+    // Key: NOVITA_API_KEY (novita.ai/settings/key-management). Base URL
+    // api.novita.ai/openai. The $0 lineup CHURNS monthly — current zero-priced
+    // ids per novita.ai/pricing (2026-11-17): "zai-org/glm-new" (193K ctx) and
+    // "apodex/apodex-1.1-mini"; find fresh ones via GET /openai/v1/models
+    // (each entry carries input_token_price_per_m / output_token_price_per_m —
+    // pick the 0/0 ones). T1 (new account) defaults ~30 RPM / 50M TPM per model.
+    "novita": {
+      "name": "Novita AI ($0 rotating models)",
+      "env": [
+        "NOVITA_API_KEY"
+      ],
+      "package": "@opencode/ai/providers/openai-compatible",
+      "settings": {
+        "baseURL": "https://api.novita.ai/openai/v1"
+      },
+      "models": {
+        "glm-new-free": {
+          "name": "GLM New ($0 rotating, 193K ctx)",
+          "modelID": "zai-org/glm-new",
+          "limit": {
+            "context": 193000,
+            "output": 32768
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "apodex-1.1-mini-free": {
+          "name": "Apodex 1.1 Mini ($0 rotating)",
+          "modelID": "apodex/apodex-1.1-mini",
+          "limit": {
+            "context": 131072,
+            "output": 16384
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        }
+      }
+    },
+    // ======================================================================
+    // Google AI Studio / Gemini API free tier (key: GOOGLE_GENERATIVE_AI_API_KEY,
+    // aistudio.google.com, no card). Free limits are per project, unpublished;
+    // reported readings 2026-10-21: gemini-3.8-flash 5 RPM / 250K TPM / 20 RPD,
+    // flash-lite 15 RPM / 500 RPD, gemma-4 30 RPM / 14,400 RPD.
+    // PRIVACY: free-tier prompts are used to improve Google products — never point
+    // these at the confidential repo contents.
+    "google": {
+      "name": "Google Gemini API (free tier)",
+      "env": [
+        "GOOGLE_GENERATIVE_AI_API_KEY"
+      ],
+      "models": {
+        "gemini-3.8-flash": {
+          "name": "Gemini 3.8 Flash (free: 5 RPM / 20 RPD)",
+          "modelID": "gemini-3.8-flash",
+          "limit": {
+            "context": 1048576,
+            "output": 65536
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "gemini-3.5-flash-lite": {
+          "name": "Gemini 3.5 Flash-Lite (free: 15 RPM / 500 RPD)",
+          "modelID": "gemini-3.5-flash-lite",
+          "limit": {
+            "context": 1048576,
+            "output": 8192
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        },
+        "gemma-4": {
+          "name": "Gemma 4 (free: 30 RPM / 14,400 RPD)",
+          "modelID": "gemma-4",
+          "limit": {
+            "context": 262144,
+            "output": 8192
+          },
+          "capabilities": {
+            "tools": true,
+            "input": [
+              "text",
+              "image"
+            ],
+            "output": [
+              "text"
+            ]
+          }
+        }
+      }
+    }
+  },
+  // ======================================================================
+  // MCP servers (direct tools, not Code Mode): context7 + deepwiki (docs), thinking (structured reasoning), memory (orchestrator only, no personal/medical data), playwright + devtools (tester only), github (off until signed in)
+  "mcp": {
+    "servers": {
+      "context7": {
+        "type": "remote",
+        "url": "https://mcp.context7.com/mcp",
+        "oauth": false,
+        "codemode": false,
+        "timeout": {
+          "startup": 60000,
+          "catalog": 90000,
+          "execution": 120000
+        }
+      },
+      "deepwiki": {
+        "type": "remote",
+        "url": "https://mcp.deepwiki.com/mcp",
+        "oauth": false,
+        "codemode": false,
+        "timeout": {
+          "startup": 60000,
+          "catalog": 90000,
+          "execution": 180000
+        }
+      },
+      "thinking": {
+        "type": "local",
+        "command": [
+          "npx",
+          "-y",
+          "@modelcontextprotocol/server-sequential-thinking@2.1.1"
+        ],
+        "codemode": false,
+        "timeout": {
+          "startup": 90000,
+          "catalog": 30000,
+          "execution": 60000
+        }
+      },
+      "memory": {
+        "type": "local",
+        "command": [
+          "npx",
+          "-y",
+          "@modelcontextprotocol/server-memory@2.1.1"
+        ],
+        "environment": {
+          "MEMORY_FILE_PATH": "{env:HOME}/.config/opencode/memory.json"
+        },
+        "codemode": false,
+        "timeout": {
+          "startup": 90000,
+          "catalog": 30000,
+          "execution": 60000
+        }
+      },
+      // ---- visuals / design MCPs (keyless, npx) ----
+      // mermaid: fully LOCAL renderer (no browser) — safe for confidential diagram sources
+      // (zombie-mermaid CLI exposes `mcp` subcommand; tools: render_mermaid_svg/ascii, verified 2026-11-17)
+      "mermaid": {
+        "type": "local",
+        "command": ["npx", "-y", "zombie-mermaid", "mcp"],
+        "codemode": false,
+        "timeout": { "startup": 120000, "catalog": 30000, "execution": 120000 }
+      },
+      // kroki: 29+ diagram engines via kroki.io; sources NOT stored (privacy policy 2026-10-25, logs <30d) — still prefer mermaid-local for confidential content
+      "kroki": {
+        "type": "local",
+        "command": ["npx", "-y", "kroki-mcp"],
+        "codemode": false,
+        "timeout": { "startup": 120000, "catalog": 30000, "execution": 120000 }
+      },
+      // quickchart: chart.js -> PNG/SVG via quickchart.io; free URLs are PUBLIC — public data only
+      "quickchart": {
+        "type": "local",
+        "command": ["npx", "-y", "@gongrzhe/quickchart-mcp-server"],
+        "codemode": false,
+        "timeout": { "startup": 120000, "catalog": 30000, "execution": 120000 }
+      },
+      // excalidraw: local .excalidraw file CRUD + SVG/PNG export — fully local, confidential OK
+      "excalidraw": {
+        "type": "local",
+        "command": ["npx", "-y", "excalidraw-mcp"],
+        "codemode": false,
+        "timeout": { "startup": 120000, "catalog": 30000, "execution": 120000 }
+      },
+      // ---- security / RE MCPs (keyless) ----
+      // CVE/advisory lookup is NOT an MCP on this box (npm NVD/OSV servers need Node >=24;
+      // pypi nvd-cve-mcp-server breaks on Python 3.14) — use the CLI helpers instead:
+      //   ~/.local/bin/cve CVE-2021-44228 | cve -k keyword | cve --cpe ...   (NVD API, keyless 5/30s, KEV flag)
+      //   ~/.local/bin/osvq --pkg requests --eco PyPI --ver 2.31.0           (OSV.dev, keyless)
+      //   ~/.local/bin/osv-scanner ...                                        (offline dep scans)
+      // mitre: ATT&CK STIX (verified 2026-11-17: 26 tools via `npx -y mitre-mcp`)
+      "mitre": {
+        "type": "local",
+        "command": ["npx", "-y", "mitre-mcp"],
+        "codemode": false,
+        "timeout": { "startup": 240000, "catalog": 60000, "execution": 120000 }
+      },
+      // ---- env-gated OSINT/reputation MCPs: flip "disabled" to false when you have the free key ----
+      // KNOWN ISSUE (diagnosed live 2026-11-18): both packages read the API key at process
+      // startup and FATAL-exit when it is missing ("SHODAN_API_KEY environment variable is
+      // required." / "VIRUSTOTAL_API_KEY ... required"), so enabling them without a key in
+      // the env makes the MCP server error out instead of connecting. That is why they stay
+      // disabled until you export a free signup key (shodan.io / virustotal.com) — then run
+      // `export SHODAN_API_KEY=... VIRUSTOTAL_API_KEY=...`, set "disabled": false, reload.
+      "shodan": {
+        "type": "local",
+        "command": ["npx", "-y", "@burtthecoder/mcp-shodan@1.0.41"],
+        "environment": { "SHODAN_API_KEY": "{env:SHODAN_API_KEY}" },
+        "disabled": true,
+        "codemode": false
+      },
+      "virustotal": {
+        "type": "local",
+        "command": ["npx", "-y", "@burtthecoder/mcp-virustotal@1.0.40"],
+        "environment": { "VIRUSTOTAL_API_KEY": "{env:VIRUSTOTAL_API_KEY}" },
+        "disabled": true,
+        "codemode": false
+      },
+      // ---- Canva remote MCP: per-user OAuth, no API key ----
+      // https://mcp.canva.com/mcp — first use triggers browser consent; complete it with
+      // `opencode mcp auth canva`. Canva tools can MODIFY real designs -> allowed only for
+      // orchestrator + designer (global deny below; per-agent allows in agents/*.md).
+      "canva": {
+        "type": "remote",
+        "url": "https://mcp.canva.com/mcp",
+        "oauth": false,
+        "codemode": false,
+        "timeout": {
+          "startup": 60000,
+          "catalog": 90000,
+          "execution": 180000
+        }
+      },
+      // ---- Playwright Workspaces remote MCP (Microsoft) — TEMPLATE, disabled ----
+      // Needs an Azure Playwright Workspace (Entra ID app or workspace API token) — not
+      // available on this box. To enable: create a workspace at
+      // https://playwright.microsoft.com, then fill in {region} + {workspaceId} below and
+      // either OAuth via `opencode mcp auth playwright-workspace` (Entra ID) or add
+      // "headers": { "x-api-key": "{env:PLAYWRIGHT_WORKSPACE_API_KEY}" }.
+      // URL shape: https://{region}.mcp.playwright.microsoft.com/playwrightworkspaces/{workspaceId}/mcp
+      "playwright-workspace": {
+        "type": "remote",
+        "url": "https://eastus.mcp.playwright.microsoft.com/playwrightworkspaces/YOUR_WORKSPACE_ID/mcp",
+        "headers": { "x-api-key": "{env:PLAYWRIGHT_WORKSPACE_API_KEY}" },
+        "disabled": true,
+        "codemode": false,
+        "timeout": {
+          "startup": 60000,
+          "catalog": 90000,
+          "execution": 300000
+        }
+      },
+      "playwright": {
+        "type": "local",
+        "command": [
+          "npx",
+          "-y",
+          "@playwright/mcp@0.0.85",
+          "--headless",
+          "--isolated",
+          "--browser",
+          "chromium"
+        ],
+        "codemode": false,
+        "timeout": {
+          "startup": 180000,
+          "catalog": 60000,
+          "execution": 300000
+        }
+      },
+      // chrome-devtools-mcp: Chrome DevTools protocol MCP (33 tools verified 2026-11-17).
+      // No Chrome in PATH on this box -> point at the system Chromium binary and pass
+      // --no-sandbox via --chrome-arg (we run as root; Chromium refuses to start sandboxed).
+      "devtools": {
+        "type": "local",
+        "command": [
+          "npx",
+          "-y",
+          "chrome-devtools-mcp@1.13.0",
+          "--headless",
+          "--isolated",
+          "--no-usage-statistics",
+          "--no-performance-crux",
+          "--executablePath",
+          "/usr/lib64/chromium-browser/chromium-browser",
+          "--chrome-arg=--no-sandbox",
+          "--chrome-arg=--disable-setuid-sandbox"
+        ],
+        "codemode": false,
+        "timeout": {
+          "startup": 180000,
+          "catalog": 60000,
+          "execution": 300000
+        }
+      },
+      "github": {
+        "type": "remote",
+        "url": "https://api.githubcopilot.com/mcp/",
+        "disabled": true,
+        "codemode": false,
+        "timeout": {
+          "startup": 60000,
+          "catalog": 90000,
+          "execution": 120000
+        }
+      }
+    }
+  },
+  // ======================================================================
+  // Parallel agents: git worktrees live here (inside the project, git-ignored via .scratch)
+  "worktree": {
+    "directory": ".scratch/wt"
+  },
+  // ======================================================================
+  // Long-running work: todo list, background compaction, large keep window
+  "experimental": {
+    "todo": true,
+    "subagent_depth": 1,
+    "background_compaction": true,
+    // default model for the experimental_image_generate tool: OpenRouter :free image model
+    // (grok-imagine-image-2.0 on Zen returned "Invalid credential" live 2026-11-17).
+    // Privacy: OpenRouter free-tier hosts may train on prompts -> PUBLIC / non-confidential only.
+    "image_generate": {
+      "model": "openrouter/recraft/recraft-v4.1-flash-v2:free"
+    }
+  },
+  "compaction": {
+    "auto": true,
+    "keep": {
+      "tokens": 64000
+    },
+    "buffer": "20%"
+  },
+  // ======================================================================
+  // Permissions (ordered, LAST match wins): broad allows first, then credential denies, then asks
+  "permissions": [
+    {"action": "read", "resource": "*", "effect": "allow"},
+    {"action": "glob", "resource": "*", "effect": "allow"},
+    {"action": "grep", "resource": "*", "effect": "allow"},
+    {"action": "edit", "resource": "*", "effect": "allow"},
+    {"action": "shell", "resource": "*", "effect": "allow"},
+    {"action": "webfetch", "resource": "*", "effect": "deny"},
+    {"action": "websearch", "resource": "*", "effect": "deny"},
+    {"action": "skill", "resource": "*", "effect": "allow"},
+    {"action": "question", "resource": "*", "effect": "allow"},
+    {"action": "subagent", "resource": "*", "effect": "deny"},
+    {"action": "playwright_*", "resource": "*", "effect": "deny"},
+    {"action": "context7_*", "resource": "*", "effect": "deny"},
+    {"action": "deepwiki_*", "resource": "*", "effect": "deny"},
+    // visuals + security MCPs: denied globally, re-allowed per agent (orchestrator/designer/sec/re/researcher)
+    {"action": "kroki_*", "resource": "*", "effect": "deny"},
+    {"action": "mermaid_*", "resource": "*", "effect": "deny"},
+    {"action": "quickchart_*", "resource": "*", "effect": "deny"},
+    {"action": "excalidraw_*", "resource": "*", "effect": "deny"},
+    // (nvd_*/osv_* MCP entries removed 2026-11-17 — those servers need Node>=24; CVE/OSV lookup is via ~/.local/bin/cve and ~/.local/bin/osvq shell helpers now)
+    {"action": "mitre_*", "resource": "*", "effect": "deny"},
+    {"action": "experimental_image_generate", "resource": "*", "effect": "deny"},
+    {"action": "memory_*", "resource": "*", "effect": "deny"},
+    {"action": "thinking_*", "resource": "*", "effect": "deny"},
+    {"action": "devtools_*", "resource": "*", "effect": "deny"},
+    {"action": "canva_*", "resource": "*", "effect": "deny"},
+    {"action": "playwright_workspace_*", "resource": "*", "effect": "deny"},
+    {"action": "shodan_*", "resource": "*", "effect": "deny"},
+    {"action": "virustotal_*", "resource": "*", "effect": "deny"},
+    {"action": "github_*", "resource": "*", "effect": "ask"},
+    {"action": "external_directory", "resource": "*", "effect": "ask"},
+    {"action": "read", "resource": "*/.ssh/*", "effect": "deny"},
+    {"action": "edit", "resource": "*/.ssh/*", "effect": "deny"},
+    {"action": "grep", "resource": "*/.ssh/*", "effect": "deny"},
+    {"action": "glob", "resource": "*/.ssh/*", "effect": "deny"},
+    {"action": "shell", "resource": "*/.ssh/*", "effect": "deny"},
+    {"action": "read", "resource": "*/.aws/*", "effect": "deny"},
+    {"action": "edit", "resource": "*/.aws/*", "effect": "deny"},
+    {"action": "grep", "resource": "*/.aws/*", "effect": "deny"},
+    {"action": "glob", "resource": "*/.aws/*", "effect": "deny"},
+    {"action": "shell", "resource": "*/.aws/*", "effect": "deny"},
+    {"action": "read", "resource": "*/.gnupg/*", "effect": "deny"},
+    {"action": "edit", "resource": "*/.gnupg/*", "effect": "deny"},
+    {"action": "grep", "resource": "*/.gnupg/*", "effect": "deny"},
+    {"action": "glob", "resource": "*/.gnupg/*", "effect": "deny"},
+    {"action": "shell", "resource": "*/.gnupg/*", "effect": "deny"},
+    {"action": "read", "resource": "*/.kube/*", "effect": "deny"},
+    {"action": "edit", "resource": "*/.kube/*", "effect": "deny"},
+    {"action": "grep", "resource": "*/.kube/*", "effect": "deny"},
+    {"action": "glob", "resource": "*/.kube/*", "effect": "deny"},
+    {"action": "shell", "resource": "*/.kube/*", "effect": "deny"},
+    {"action": "read", "resource": "*/.config/gh/*", "effect": "deny"},
+    {"action": "edit", "resource": "*/.config/gh/*", "effect": "deny"},
+    {"action": "grep", "resource": "*/.config/gh/*", "effect": "deny"},
+    {"action": "glob", "resource": "*/.config/gh/*", "effect": "deny"},
+    {"action": "shell", "resource": "*/.config/gh/*", "effect": "deny"},
+    {"action": "read", "resource": "*/.docker/config.json", "effect": "deny"},
+    {"action": "edit", "resource": "*/.docker/config.json", "effect": "deny"},
+    {"action": "grep", "resource": "*/.docker/config.json", "effect": "deny"},
+    {"action": "glob", "resource": "*/.docker/config.json", "effect": "deny"},
+    {"action": "shell", "resource": "*/.docker/config.json*", "effect": "deny"},
+    {"action": "read", "resource": "*/.gcp/*", "effect": "deny"},
+    {"action": "edit", "resource": "*/.gcp/*", "effect": "deny"},
+    {"action": "grep", "resource": "*/.gcp/*", "effect": "deny"},
+    {"action": "glob", "resource": "*/.gcp/*", "effect": "deny"},
+    {"action": "shell", "resource": "*/.gcp/*", "effect": "deny"},
+    {"action": "read", "resource": "*/.azure/*", "effect": "deny"},
+    {"action": "edit", "resource": "*/.azure/*", "effect": "deny"},
+    {"action": "grep", "resource": "*/.azure/*", "effect": "deny"},
+    {"action": "glob", "resource": "*/.azure/*", "effect": "deny"},
+    {"action": "shell", "resource": "*/.azure/*", "effect": "deny"},
+    {"action": "read", "resource": "*/.config/gcloud/*", "effect": "deny"},
+    {"action": "edit", "resource": "*/.config/gcloud/*", "effect": "deny"},
+    {"action": "grep", "resource": "*/.config/gcloud/*", "effect": "deny"},
+    {"action": "glob", "resource": "*/.config/gcloud/*", "effect": "deny"},
+    {"action": "shell", "resource": "*/.config/gcloud/*", "effect": "deny"},
+    {"action": "read", "resource": "*/.pypirc", "effect": "deny"},
+    {"action": "edit", "resource": "*/.pypirc", "effect": "deny"},
+    {"action": "grep", "resource": "*/.pypirc", "effect": "deny"},
+    {"action": "glob", "resource": "*/.pypirc", "effect": "deny"},
+    {"action": "shell", "resource": "*/.pypirc*", "effect": "deny"},
+    {"action": "read", "resource": "*/.netrc", "effect": "deny"},
+    {"action": "edit", "resource": "*/.netrc", "effect": "deny"},
+    {"action": "grep", "resource": "*/.netrc", "effect": "deny"},
+    {"action": "glob", "resource": "*/.netrc", "effect": "deny"},
+    {"action": "shell", "resource": "*/.netrc*", "effect": "deny"},
+    {"action": "read", "resource": "*/.git-credentials", "effect": "deny"},
+    {"action": "edit", "resource": "*/.git-credentials", "effect": "deny"},
+    {"action": "grep", "resource": "*/.git-credentials", "effect": "deny"},
+    {"action": "glob", "resource": "*/.git-credentials", "effect": "deny"},
+    {"action": "shell", "resource": "*/.git-credentials*", "effect": "deny"},
+    {"action": "read", "resource": "*/.local/share/opencode/auth.json", "effect": "deny"},
+    {"action": "edit", "resource": "*/.local/share/opencode/auth.json", "effect": "deny"},
+    {"action": "grep", "resource": "*/.local/share/opencode/auth.json", "effect": "deny"},
+    {"action": "glob", "resource": "*/.local/share/opencode/auth.json", "effect": "deny"},
+    {"action": "shell", "resource": "*/.local/share/opencode/auth.json*", "effect": "deny"},
+    {"action": "read", "resource": "*/.local/share/opencode/opencode.db*", "effect": "deny"},
+    {"action": "edit", "resource": "*/.local/share/opencode/opencode.db*", "effect": "deny"},
+    {"action": "grep", "resource": "*/.local/share/opencode/opencode.db*", "effect": "deny"},
+    {"action": "glob", "resource": "*/.local/share/opencode/opencode.db*", "effect": "deny"},
+    {"action": "shell", "resource": "*/.local/share/opencode/opencode.db*", "effect": "deny"},
+    {"action": "shell", "resource": "*auth.json*", "effect": "deny"},
+    {"action": "shell", "resource": "*opencode.db*", "effect": "deny"},
+    {"action": "read", "resource": "*.env", "effect": "deny"},
+    {"action": "edit", "resource": "*.env", "effect": "deny"},
+    {"action": "grep", "resource": "*.env*", "effect": "deny"},
+    {"action": "glob", "resource": "*.env*", "effect": "deny"},
+    {"action": "shell", "resource": "*/.env*", "effect": "deny"},
+    {"action": "read", "resource": "*/.env", "effect": "deny"},
+    {"action": "edit", "resource": "*/.env", "effect": "deny"},
+    {"action": "read", "resource": "*.env.example", "effect": "allow"},
+    {"action": "read", "resource": "*.env.sample", "effect": "allow"},
+    {"action": "read", "resource": "*confidential*", "effect": "ask"},
+    {"action": "edit", "resource": "*confidential*", "effect": "ask"},
+    {"action": "grep", "resource": "*confidential*", "effect": "ask"},
+    {"action": "glob", "resource": "*confidential*", "effect": "ask"},
+    {"action": "shell", "resource": "*confidential*", "effect": "ask"},
+    {"action": "read", "resource": "*.pem", "effect": "ask"},
+    {"action": "edit", "resource": "*.pem", "effect": "deny"},
+    {"action": "grep", "resource": "*.pem", "effect": "deny"},
+    {"action": "shell", "resource": "*.pem*", "effect": "deny"},
+    {"action": "read", "resource": "*.key", "effect": "ask"},
+    {"action": "edit", "resource": "*.key", "effect": "deny"},
+    {"action": "grep", "resource": "*.key", "effect": "deny"},
+    {"action": "shell", "resource": "*.key*", "effect": "deny"},
+    {"action": "read", "resource": "*id_rsa*", "effect": "deny"},
+    {"action": "shell", "resource": "*id_rsa*", "effect": "deny"},
+    {"action": "read", "resource": "*credentials*", "effect": "deny"},
+    {"action": "grep", "resource": "*credentials*", "effect": "deny"},
+    {"action": "shell", "resource": "*credentials*", "effect": "deny"},
+    {"action": "read", "resource": "*secret*", "effect": "deny"},
+    {"action": "grep", "resource": "*secret*", "effect": "deny"},
+    {"action": "shell", "resource": "*secret*", "effect": "deny"},
+    {"action": "read", "resource": "*/.npmrc", "effect": "deny"},
+    {"action": "shell", "resource": "*/.npmrc*", "effect": "deny"},
+    {"action": "edit", "resource": "*/.config/opencode/*", "effect": "ask"},
+    {"action": "shell", "resource": "rm *", "effect": "ask"},
+    {"action": "shell", "resource": "sh *", "effect": "ask"},
+    {"action": "shell", "resource": "bash *", "effect": "ask"},
+    {"action": "shell", "resource": "zsh *", "effect": "ask"},
+    {"action": "shell", "resource": "eval *", "effect": "ask"},
+    {"action": "shell", "resource": "exec *", "effect": "ask"},
+    {"action": "shell", "resource": "wget *", "effect": "ask"},
+    {"action": "shell", "resource": "curl *", "effect": "ask"},
+    {"action": "shell", "resource": "nc *", "effect": "ask"},
+    {"action": "shell", "resource": "ncat *", "effect": "ask"},
+    {"action": "shell", "resource": "ssh *", "effect": "ask"},
+    {"action": "shell", "resource": "scp *", "effect": "ask"},
+    {"action": "shell", "resource": "rsync *", "effect": "ask"},
+    {"action": "shell", "resource": "python3 -c *", "effect": "ask"},
+    {"action": "shell", "resource": "python -c *", "effect": "ask"},
+    {"action": "shell", "resource": "node -e *", "effect": "ask"},
+    {"action": "shell", "resource": "perl -e *", "effect": "ask"},
+    {"action": "shell", "resource": "ruby -e *", "effect": "ask"},
+    {"action": "shell", "resource": "base64 *", "effect": "ask"},
+    {"action": "shell", "resource": "*|sh*", "effect": "ask"},
+    {"action": "shell", "resource": "*|bash*", "effect": "ask"},
+    {"action": "shell", "resource": "sudo *", "effect": "ask"},
+    {"action": "shell", "resource": "dnf *", "effect": "ask"},
+    {"action": "shell", "resource": "dd *", "effect": "ask"},
+    {"action": "shell", "resource": "mkfs*", "effect": "ask"},
+    {"action": "shell", "resource": "shutdown*", "effect": "ask"},
+    {"action": "shell", "resource": "reboot*", "effect": "ask"},
+    {"action": "shell", "resource": "git push *", "effect": "ask"},
+    {"action": "shell", "resource": "git reset --hard *", "effect": "ask"},
+    {"action": "shell", "resource": "git branch -D *", "effect": "ask"},
+    {"action": "shell", "resource": "git branch -d *--force*", "effect": "ask"},
+    {"action": "shell", "resource": "git worktree remove *--force*", "effect": "ask"},
+    {"action": "shell", "resource": "git worktree prune*", "effect": "ask"},
+    {"action": "shell", "resource": "git rebase *", "effect": "ask"},
+    {"action": "shell", "resource": "git stash drop*", "effect": "ask"},
+    {"action": "shell", "resource": "git stash clear*", "effect": "ask"},
+    {"action": "shell", "resource": "git reflog expire*", "effect": "ask"},
+    {"action": "shell", "resource": "git gc *--prune*", "effect": "ask"},
+    {"action": "shell", "resource": "git clean -f*", "effect": "ask"},
+    {"action": "shell", "resource": "git checkout -- *", "effect": "ask"},
+    {"action": "shell", "resource": "docker push *", "effect": "ask"},
+    {"action": "shell", "resource": "docker * prune*", "effect": "ask"},
+    {"action": "shell", "resource": "npm publish*", "effect": "ask"},
+    {"action": "shell", "resource": "cargo publish*", "effect": "ask"},
+    {"action": "shell", "resource": "twine upload*", "effect": "ask"},
+    {"action": "shell", "resource": "terraform apply*", "effect": "ask"},
+    {"action": "shell", "resource": "terraform destroy*", "effect": "ask"},
+    {"action": "shell", "resource": "kubectl apply*", "effect": "ask"},
+    {"action": "shell", "resource": "kubectl delete*", "effect": "ask"},
+    {"action": "shell", "resource": "curl *-d *", "effect": "ask"},
+    {"action": "shell", "resource": "curl *--data*", "effect": "ask"},
+    {"action": "shell", "resource": "curl *-F *", "effect": "ask"},
+    {"action": "shell", "resource": "curl *-T *", "effect": "ask"},
+    {"action": "shell", "resource": "scp *", "effect": "ask"},
+    {"action": "shell", "resource": "* | sh*", "effect": "ask"},
+    {"action": "shell", "resource": "* | bash*", "effect": "ask"}
+  ],
+  // ======================================================================
+  // Policies: hard denies that an approval prompt cannot override (shell only)
+  "policies": [
+    {"action": "tool.use", "resource": "shell:* | sh*", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:* | bash*", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:* | sudo *", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:*opencode.db*", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:*auth.json*", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:rm -rf /", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:rm -rf ~", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:rm -rf $HOME", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:git push *--force*", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:git push -f*", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:git push * -f*", "effect": "deny"},
+    // catastrophic commands — hard deny, an approval prompt cannot override these;
+    // the guardrails plugin adds a regex layer for patterns globs express badly.
+    // If you ever really need one, run it manually in your own terminal.
+    {"action": "tool.use", "resource": "shell:rm -rf / *", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:rm -rf /*", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:rm -rf ~ *", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:rm -rf ~/*", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:rm -rf $HOME *", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:rm -rf $HOME/*", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:rm -rf .", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:rm -rf ./", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:rm -rf . *", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:rm -rf --no-preserve-root *", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:rm -r /", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:rm -fr / *", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:dd *of=/dev/*", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:mkfs*", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:wipefs *", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:blkdiscard *", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:chmod -R 777 / *", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:shutdown *", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:reboot *", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:poweroff *", "effect": "deny"},
+    {"action": "tool.use", "resource": "shell:halt *", "effect": "deny"}
+  ]
+}
