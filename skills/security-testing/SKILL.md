@@ -1,5 +1,5 @@
 ---
-name: "Security Testing"
+name: security-testing
 description: "Use for authorized security testing, threat modelling, vulnerability assessment, secure code review, dependency/secret/IaC scanning and hardening of the user's own systems (localhost, staging, lab)."
 ---
 

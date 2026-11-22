@@ -1,13 +1,16 @@
 ---
-description: "Resume a long task from PLAN.md in the project root"
+description: "Pick up where we left off, using PLAN.md and CONTEXT.md in the project root"
 ---
 
-Resume the task. Notes: $ARGUMENTS
+Pick up where we left off. Notes: $ARGUMENTS
 
-Plan file (single source of truth, auto-loaded via `instructions`):
-!`head -n 200 PLAN.md 2>/dev/null || echo "(no PLAN.md: ask what to resume)"`
+Plan:
+!`head -n 120 PLAN.md 2>/dev/null || echo "(no PLAN.md: ask what to pick up)"`
+
+Context:
+!`head -n 80 CONTEXT.md 2>/dev/null || echo "(no CONTEXT.md yet)"`
 
 Git status:
 !`git status --short 2>/dev/null | head -n 40`
 
-Restate where we are in 3 lines, then carry on from NEXT ACTION in PLAN.md following the `long-running-work` skill.
+Say where we are in 3 short lines, then carry on from "Next" in PLAN.md (skill `long-running-work`). If a specialist was still working when we stopped, check its branch with `git log` and `git diff` before starting anything new.

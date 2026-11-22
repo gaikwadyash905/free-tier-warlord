@@ -1,5 +1,5 @@
 ---
-name: "Physics and Mathematical Modeling"
+name: physics-modeling
 description: "Use for physics derivations, simulations, numerical methods, mathematical proofs, statistics and algorithm analysis that must be verified numerically with explicit units, uncertainty and result labels."
 ---
 

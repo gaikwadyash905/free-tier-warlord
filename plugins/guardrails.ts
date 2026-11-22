@@ -1,20 +1,24 @@
 import { Plugin } from "@opencode/plugin"
-import { appendFileSync } from "node:fs"
+import { appendFileSync, mkdirSync } from "node:fs"
 
-// guardrails: defense-in-depth shell-command blocker (the Codex "PreToolUse deny"
-// equivalent). Permission rules + policies already deny/ask most dangerous commands;
-// this plugin adds a regex layer on the raw command string so patterns that globs
-// express badly (rm -rf with mixed flags and root targets, dd of=/dev/..., find /
-// -delete, fork bombs) are rejected BEFORE execution. Only tool.execute.before may
-// fail — a throw there rejects the tool call, the command never runs.
+// guardrails: a regex layer on shell commands for patterns that permission globs
+// express badly (rm -rf with mixed flags, dd of=/dev/..., find / -delete, fork bombs).
 //
-// Every decision is appended to LOG_FILE. A bug in this plugin must never block a
-// legitimate tool call: only an intentional "[guardrails]" error is re-thrown.
+// Two hooks, because the OpenCode docs (checked 2026-11-22) document only one of them
+// as a way to deny:
+//   1. ctx.permission.hook("evaluate"): documented. Setting event.effect = "deny" with a
+//      message blocks the call (a deny already in opencode.jsonc stays final).
+//   2. ctx.tool.hook("execute.before"): throwing is NOT documented as blocking; kept as a
+//      second chance in case this version honours it.
+// Each hook is registered separately inside try/catch, so a wrong guess about one API
+// never stops the other, and a bug here never blocks a legitimate call.
+// Check it works: run `scripts/test-guardrails.mjs` (rules) and TESTING.md step 3 (live).
 
 const LOG_FILE = "/tmp/opencode/guardrails.log"
 
 function log(line: string) {
   try {
+    mkdirSync("/tmp/opencode", { recursive: true })
     appendFileSync(LOG_FILE, `${new Date().toISOString()} ${line}\n`)
   } catch {
     /* never throw from logging */
@@ -35,7 +39,7 @@ const BLOCKED: Array<[RegExp, string]> = [
   [/>\s*\/dev\/(sd|hd|vd|xvd|nvme|mmcblk)/, "redirect into a block device"],
   [/\bchmod\s+-R\s+[0-7]{3,4}\s+\//, "recursive chmod on /"],
   [/\bfind\s+\/(?:\s|$)[^;|&]*-delete/, "find / -delete"],
-  [/\b(shutdown|poweroff|halt|reboot)\b/, "power command"],
+  [/(?:^|[;&|]\s*|\bsudo\s+)(shutdown|poweroff|halt|reboot)\b/, "power command"],
   [/:\(\)\s*\{\s*:\|:&\s*\}\s*;?\s*:/, "fork bomb"],
 ]
 
@@ -53,26 +57,55 @@ function commandOf(input: unknown): string {
   return ""
 }
 
+function check(cmd: string): string | undefined {
+  for (const [re, reason] of BLOCKED) if (re.test(cmd)) return reason
+  return undefined
+}
+
 export default Plugin.define({
   id: "guardrails",
-  async setup(ctx) {
-    await ctx.tool.hook("execute.before", async (event) => {
-      try {
-        if (event.tool !== "shell") return
-        const cmd = commandOf(event.input)
-        if (!cmd) return
-        for (const [re, reason] of BLOCKED) {
-          if (re.test(cmd)) {
-            log(`${event.sessionID} BLOCKED [${event.agent}] ${reason}: ${cmd.slice(0, 200)}`)
+  async setup(ctx: any) {
+    try {
+      await ctx.permission.hook("evaluate", (event: any) => {
+        try {
+          if (event.action !== "shell") return
+          const resources: unknown[] = Array.isArray(event.resources) ? event.resources : []
+          for (const r of resources) {
+            const reason = check(String(r))
+            if (reason) {
+              event.effect = "deny"
+              event.message = `[guardrails] blocked: ${reason}. Run it yourself in a terminal if you really mean it.`
+              log(`${event.sessionID} DENY(permission) [${event.agent}] ${reason}: ${String(r).slice(0, 200)}`)
+              return
+            }
+          }
+        } catch (err) {
+          log(`permission handler error (ignored): ${String(err)}`)
+        }
+      })
+      log("permission.evaluate hook registered")
+    } catch (err) {
+      log(`permission hook not available: ${String(err)}`)
+    }
+
+    try {
+      await ctx.tool.hook("execute.before", async (event: any) => {
+        try {
+          if (event.tool !== "shell") return
+          const cmd = commandOf(event.input)
+          const reason = cmd ? check(cmd) : undefined
+          if (reason) {
+            log(`${event.sessionID} BLOCK(tool) [${event.agent}] ${reason}: ${cmd.slice(0, 200)}`)
             throw new Error(`[guardrails] blocked: ${reason}. Command: ${cmd.slice(0, 160)}`)
           }
+        } catch (err) {
+          if (err instanceof Error && err.message.startsWith("[guardrails]")) throw err
+          log(`tool handler error (ignored): ${String(err)}`)
         }
-      } catch (err) {
-        // re-throw only intentional blocks; swallow anything else so a plugin bug never blocks tools
-        if (err instanceof Error && err.message.startsWith("[guardrails]")) throw err
-        log(`handler error (ignored): ${String(err)}`)
-      }
-    })
-    log("plugin loaded: execute.before shell guardrails active")
+      })
+      log("tool.execute.before hook registered")
+    } catch (err) {
+      log(`tool hook not available: ${String(err)}`)
+    }
   },
 })

@@ -1,5 +1,5 @@
 ---
-name: "Git Workflow"
+name: git-workflow
 description: "Use when committing, branching, writing commit messages or PR descriptions, or working with git worktrees. Never pushes or rewrites history unless asked."
 ---
 

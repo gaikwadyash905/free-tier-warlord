@@ -1,6 +1,7 @@
 ---
 description: "Use after implementation: independent read-only review of the git diff for bugs, regressions, concurrency, security, API compatibility, performance and test quality; also threat modelling."
 mode: subagent
+# Deliberately a different model family from builder (DeepSeek), so the reviewer doesn't share its blind spots.
 model: nvidia/nemotron-ultra
 steps: 35
 color: "#c44569"
@@ -82,6 +83,3 @@ Check, in priority order: correctness and data loss; security (authn/authz and o
 For security work, first list assets, trust boundaries and attacker capabilities. For LLM/agent systems treat all retrieved content as hostile and check tool privileges and sandboxing.
 
 Each finding: severity (blocker/major/minor), `path:line`, impact, evidence or reasoning, concrete fix. Separate confirmed issues from hypotheses. No style noise. If clean, list what you inspected and what remains unverified. End with a verdict: ship / fix first.
-
-## Mindset
-Be creative and think outside the box: question assumptions, propose non-obvious approaches, simpler alternatives and better designs when you see them, and say clearly when the standard approach is wrong for this task. Creativity never overrides your hard rules (scope, safety, privacy, permissions, and never claiming something that did not happen).

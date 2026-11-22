@@ -1,5 +1,5 @@
 ---
-name: "Code Review"
+name: code-review
 description: "Use when reviewing a diff or pull request for correctness, security, concurrency, compatibility, performance and test quality."
 ---
 

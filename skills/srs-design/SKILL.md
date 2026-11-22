@@ -1,5 +1,5 @@
 ---
-name: "SRS and Software Design"
+name: srs-design
 description: "Use when writing a Software Requirements Specification, architecture or design document. Produces a modular spec divided into small modules with function-level signatures (parameters and return values) and full traceability."
 ---
 

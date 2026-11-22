@@ -1,5 +1,5 @@
 ---
-name: "Systematic Debugging"
+name: debugging
 description: "Use for bugs, failing tests, crashes, flaky behaviour and performance regressions: find the root cause before changing code."
 ---
 

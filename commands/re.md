@@ -1,9 +1,9 @@
 ---
-description: "Reverse-engineer an authorized binary/firmware/APK/sample (re agent, static lab-only)"
-agent: re
+description: "Static reverse engineering of a binary, firmware, APK or sample you are authorised to analyse (sec agent)"
+agent: sec
 subagent: true
 ---
 
 Reverse-engineer: $ARGUMENTS
 
-Load the `reverse-engineering` skill. Scope gate first: confirm the target is user-authorized; static analysis only, never execute samples. Use the installed toolbox (readelf/objdump/strings/exiftool, tools venv with capstone/pyelftools/lief/pwntools/androguard/binwalk3/yara, CyberChef node API, nvd/osv/mitre MCPs). Report capabilities, key functions, IOCs, ATT&CK, CVEs, mitigations.
+Load the `security-testing` and `reverse-engineering` skills. Scope check first: confirm the file is the user's to analyse. Static analysis only; never run an untrusted sample. Report what it does, key functions, IOCs, ATT&CK techniques, CVEs and mitigations.

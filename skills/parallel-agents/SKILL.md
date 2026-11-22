@@ -1,5 +1,5 @@
 ---
-name: "Parallel Agents and Git Worktrees"
+name: parallel-agents
 description: "Use to run several subagents at once safely: split work into independent modules, give each writer its own git worktree and branch, integrate through an integration branch, run review panels and best-of-N races."
 ---
 
@@ -26,6 +26,13 @@ Dependencies are per worktree: the builder runs `npm ci` / `python3 -m venv .scr
 Goal, owned paths, forbidden paths, interface contract (signatures from the SRS), acceptance tests, and:
 "Work ONLY in `<absolute path>/.scratch/wt/<task>`. Start every shell command with `cd <that path> &&`; read and edit with absolute paths under it. Commit small conventional commits on branch `agent/<task>` (local only, never push). Run the narrow tests, then the full suite there. Report branch, commit list, tests run, anything outside your paths you needed."
 
+## Tracking who is doing what
+Git is the tracker: every writer has its own branch and worktree, so nothing collides.
+- Before launching, add one row per agent to PLAN.md under "Who's working on what": agent, branch, owned files, status (running, reported, merged).
+- At any time: `git worktree list` and `git branch --list 'agent/*' -vv` show every agent's branch, and `git log --oneline <base>..agent/<task>` shows what it has done. `/branches` and `/dashboard` print the same.
+- Update the PLAN.md row when an agent reports. After merging, mark it merged.
+- Before merging, ask `tester` for a quick check of each worktree (edits outside the owned files, test results).
+
 ## Integrate
 ```bash
 cd .scratch/wt/integration
@@ -46,4 +53,4 @@ Two builders implement the same spec in separate worktrees (`agent/<task>-a`, `-
 After the user accepted or rejected the result: `git worktree remove .scratch/wt/<task>` then `git branch -d agent/<task>` (merged branches only). Keep failed branches until the user has seen the report. `git worktree list` and `git branch --list 'agent/*' -vv` show what is left; never use `--force`, `-D` or `prune` without the user's approval.
 
 ## Failure handling
-A writer that stalls or reports blocked: wait (slow is not failed), then read its worktree `git log` and `git diff` to salvage work. A 404 from a subagent means a wrong model ID: do not retry, do the task yourself or via `general`.
+A writer that is slow: wait for its report. Never start a second writer on the same task (slow is not failed). Only a writer that reports blocked, or returns an actual error, needs action: read its worktree `git log` and `git diff` to salvage what it did. A 404 from a subagent means a wrong model ID: do not retry, do the task yourself or via `general`.

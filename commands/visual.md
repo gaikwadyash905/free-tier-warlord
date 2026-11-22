@@ -6,4 +6,4 @@ subagent: true
 
 Create the visual: $ARGUMENTS
 
-Load the `visual-design` skill. Choose the pipeline by confidentiality: confidential content -> LOCAL rendering only (mermaid_*/excalidraw_* MCPs, matplotlib, python-pptx); public content may also use kroki_*/quickchart_*/experimental_image_generate. Save source + output files, report paths and what was verified.
+Load the `visual-design` skill. Render locally (mermaid and excalidraw tools, matplotlib, python-pptx). AI images and Canva are for public, non-confidential subjects only. Save the source and the output files, and report the paths and what you could not check.

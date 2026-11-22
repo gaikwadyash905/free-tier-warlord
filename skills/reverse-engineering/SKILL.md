@@ -1,5 +1,5 @@
 ---
-name: "Reverse Engineering"
+name: reverse-engineering
 description: "Use when analyzing user-authorized binaries, firmware, APKs or malware samples (static, lab-only): triage, parsing, disassembly, IOC extraction, CVE/ATT&CK mapping. Includes the exact tool commands installed on this box."
 ---
 

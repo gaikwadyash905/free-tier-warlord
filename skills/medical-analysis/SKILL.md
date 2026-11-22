@@ -1,5 +1,5 @@
 ---
-name: "Medical Document Analysis"
+name: medical-analysis
 description: "Use for lab reports, imaging and pathology reports, discharge summaries, prescriptions, clinical papers and guidelines: private extraction, accurate tables, plain-language explanation, urgency flags, evidence appraisal. Informational, not diagnosis."
 ---
 
@@ -22,3 +22,6 @@ Appraise: design, population, comparator, outcomes (patient-important vs surroga
 
 ## 5. Boundaries
 No diagnosis, no medicine starting/stopping/dosing, no second-guessing a clinician's plan beyond raising questions. Provide red flags and when to seek care. Say what additional information (history, symptoms, medications, earlier results) would change the interpretation.
+
+## Redact first (by script)
+Run `python3 ~/.config/opencode/scripts/redact.py <file> [--name "Full Name"]` before reading a document. It removes names in labelled fields, relatives, doctors, hospitals, addresses, phone, email, ID numbers and dates, and keeps age, sex and every test value and range. Read the redacted copy in `.scratch/redacted/`, and say in the report that identifiers were removed by script and the person should skim the copy once.

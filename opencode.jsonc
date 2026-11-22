@@ -1,17 +1,19 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "default_agent": "orchestrator",
-  "instructions": ["PLAN.md"],
-  // Default model = biggest context window on the trusted NIM provider:
-  // Nemotron 3 Ultra serves 256K ctx on the hosted endpoint (NVIDIA NIM docs,
-  // 2026-06-26; live PONG 2s 2026-11-17). mistral-large-4 is 200K.
-  "model": "nvidia/nemotron-ultra",
+  // Project docs auto-loaded every session (silently skipped if the file does not exist):
+  // PLAN.md = goal / steps / who is working on what / next; CONTEXT.md = what the project is, decisions, gotchas.
+  "instructions": ["PLAN.md", "CONTEXT.md"],
+  // Default model = GLM 5.3 Flash on NVIDIA NIM (chat, routing, light work).
+  // builder, architect, reviewer and sec are pinned to nvidia/nemotron-ultra (256K ctx) in agents/*.md.
+  // `private` and `medical` run on opencode/deepseek-v4.1-flash-free (zero-retention, see README).
+  "model": "nvidia/glm-5-3-flash",
   // v2 native replacement for v1 "small_model": the built-in `title` agent
   // generates session titles, so point it at the fastest keyless zero-retention
   // free model (measured 3 s first byte 2026-11-17) instead of the NIM queue.
   "agents": {
     "title": {
-      "model": "opencode/hy4-flash-free"
+      "model": "nvidia/glm-5-3-flash"
     }
   },
   "share": "disabled",
@@ -60,26 +62,6 @@
         "timeout": 1800000
       },
       "models": {
-        "mistral-large-4": {
-          "name": "Mistral Large 4",
-          "modelID": "mistralai/mistral-large-4-1t-a52b",
-          "limit": {
-            "context": 200000,
-            "output": 32768
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text"
-            ],
-            "output": [
-              "text"
-            ],
-            "reasoning": {
-              "supported": false
-            }
-          }
-        },
         "glm-5-3-flash": {
           "name": "GLM-5.3 Flash",
           "modelID": "z-ai/glm-5.3-flash",
@@ -97,6 +79,32 @@
             ],
             "reasoning": {
               "supported": false
+            }
+          }
+        },
+        // OPT-IN, not assigned to any agent. The model card lists reasoning and image input but does not state
+        // tool calling, so run the smoke test in TESTING.md before pointing an agent at it (README: "Swapping models").
+        "deepseek-v4-1-flash": {
+          "name": "DeepSeek V4.1 Flash (NIM)",
+          "modelID": "deepseek-ai/deepseek-v4.1-flash",
+          // Conflicting evidence: our own live error showed EOL on NIM 2026-11-16, a probe on 2026-11-19 lists it free.
+          // Fallback only. scripts/models.sh check tells you if it works on your key.
+          "limit": {"context": 1000000, "output": 65536},
+          "capabilities": {"tools": true, "input": ["text"], "output": ["text"]}
+        },
+        "minimax-m3-1-flash": {
+          "name": "MiniMax M3.1 Flash",
+          "modelID": "minimaxai/minimax-m3.1-flash",
+          "limit": {
+            "context": 200000,
+            "output": 32768
+          },
+          "capabilities": {
+            "tools": true,
+            "input": ["text", "image"],
+            "output": ["text"],
+            "reasoning": {
+              "supported": true
             }
           }
         },
@@ -120,217 +128,22 @@
               "supported": false
             }
           }
-        },
-        "deepseek-v4.1-flash": {
-          "name": "DeepSeek V4.1 Flash",
-          "modelID": "deepseek-ai/deepseek-v4.1-flash",
-          // EOL on NIM 2026-11-16T08:00Z (live error 2026-11-17) — kept declared but disabled; use opencode/deepseek-v4.1-flash-free (Zen) instead
-          "disabled": true,
-          "limit": {
-            "context": 1000000,
-            "output": 384000
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text"
-            ],
-            "output": [
-              "text"
-            ]
-          }
         }
       }
     },
-    // ======================================================================
-    // Groq (free plan, no card; key: console.groq.com -> GROQ_API_KEY).
-    // Free limits per model: 30 RPM / 1,000 RPD / 8K TPM / 200K TPD (gpt-oss-120b,
-    // gpt-oss-20b, qwen3.8-27b rows verified on console.groq.com/docs/rate-limits,
-    // 2026-11-17). LPU hardware: ~280+ tok/s on llama-3.3-70b, sub-second TTFT.
-    // Bottleneck for agents = 8K TPM (big contexts eat it fast). Use for fast,
-    // small-prompt subagents.
+    // Second provider for failover (free key, no card): GROQ_API_KEY. Used only if you run
+    // `scripts/models.sh fallback`; nothing points at it by default.
     "groq": {
       "name": "Groq (free plan)",
-      "env": [
-        "GROQ_API_KEY"
-      ],
+      "env": ["GROQ_API_KEY"],
       "package": "@opencode/ai/providers/openai-compatible",
-      "settings": {
-        "baseURL": "https://api.groq.com/openai/v1"
-      },
+      "settings": {"baseURL": "https://api.groq.com/openai/v1"},
       "models": {
         "gpt-oss-120b": {
           "name": "GPT-OSS 120B (Groq free)",
           "modelID": "openai/gpt-oss-120b",
-          "limit": {
-            "context": 131072,
-            "output": 65536
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        },
-        "gpt-oss-20b": {
-          "name": "GPT-OSS 20B (Groq free)",
-          "modelID": "openai/gpt-oss-20b",
-          "limit": {
-            "context": 131072,
-            "output": 65536
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        },
-        "qwen3.8-27b": {
-          "name": "Qwen 3.8 27B (Groq free)",
-          "modelID": "qwen/qwen3.8-27b",
-          "limit": {
-            "context": 131072,
-            "output": 65536
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        },
-        "llama-3.3-70b": {
-          "name": "Llama 3.3 70B (Groq free, ~280 tok/s)",
-          "modelID": "llama-3.3-70b-versatile",
-          "limit": {
-            "context": 131072,
-            "output": 32768
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        }
-      }
-    },
-    // ======================================================================
-    // Cloudflare Workers AI (free: 10,000 Neurons/day shared, 300 RPM text gen,
-    // resets 00:00 UTC; developers.cloudflare.com/workers-ai 2026-11-17).
-    // Neuron cost is per model — 10K neurons ~= ~287K output tokens/day on
-    // llama-3.1-8b-fast, less on bigger models. Newest frontier models
-    // (GLM-5.x, DeepSeek V4, Kimi K2.6+) are paid-only. Needs a free CF account:
-    // CLOUDFLARE_API_TOKEN (Workers AI token) + CLOUDFLARE_ACCOUNT_ID.
-    "cloudflare": {
-      "name": "Cloudflare Workers AI (free 10k neurons/day)",
-      "env": [
-        "CLOUDFLARE_API_TOKEN",
-        "CLOUDFLARE_ACCOUNT_ID"
-      ],
-      "package": "@opencode/ai/providers/openai-compatible",
-      "settings": {
-        "baseURL": "https://api.cloudflare.com/client/v4/accounts/{env:CLOUDFLARE_ACCOUNT_ID}/ai/v1"
-      },
-      "models": {
-        "llama-3.3-70b-fp8-fast": {
-          "name": "Llama 3.3 70B fp8 fast (Workers AI free)",
-          "modelID": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-          "limit": {
-            "context": 131072,
-            "output": 8192
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        },
-        "gpt-oss-120b": {
-          "name": "GPT-OSS 120B (Workers AI free)",
-          "modelID": "@cf/openai/gpt-oss-120b",
-          "limit": {
-            "context": 131072,
-            "output": 8192
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        },
-        "gpt-oss-20b": {
-          "name": "GPT-OSS 20B (Workers AI free)",
-          "modelID": "@cf/openai/gpt-oss-20b",
-          "limit": {
-            "context": 131072,
-            "output": 8192
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        },
-        "qwen3.8-27b": {
-          "name": "Qwen 3.8 27B (Workers AI free)",
-          "modelID": "@cf/qwen/qwen3.8-27b",
-          "limit": {
-            "context": 131072,
-            "output": 8192
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        },
-        "llama-4-scout": {
-          "name": "Llama 4 Scout 17B (Workers AI free)",
-          "modelID": "@cf/meta/llama-4-scout-17b-16e-instruct",
-          "limit": {
-            "context": 131072,
-            "output": 8192
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text"
-            ],
-            "output": [
-              "text"
-            ]
-          }
+          "limit": {"context": 131072, "output": 65536},
+          "capabilities": {"tools": true, "input": ["text"], "output": ["text"]}
         }
       }
     },
@@ -346,222 +159,12 @@
         "OPENROUTER_API_KEY"
       ],
       "models": {
-        "nemotron-3-ultra-free": {
-          "name": "Nemotron 3 Ultra 550B :free (1M ctx)",
-          "modelID": "nvidia/nemotron-3-ultra-550b-a55b:free",
-          "limit": {
-            "context": 1000000,
-            "output": 32768
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        },
-        "nemotron-3.5-super-vl-free": {
-          "name": "Nemotron 3.5 Super VL :free (1M ctx, vision)",
-          "modelID": "nvidia/nemotron-3.5-super-vl:free",
-          "limit": {
-            "context": 1000000,
-            "output": 32768
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text",
-              "image"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        },
-        "nemotron-3-nano-omni-reasoning-free": {
-          "name": "Nemotron 3 Nano Omni 30B A3B Reasoning :free (256K ctx)",
-          "modelID": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-          "limit": {
-            "context": 256000,
-            "output": 65536
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        },
-        "nemotron-3.5-lightning-free": {
-          "name": "Nemotron 3.5 Lightning :free (1M ctx)",
-          "modelID": "nvidia/nemotron-3.5-lightning:free",
-          "limit": {
-            "context": 1000000,
-            "output": 65536
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        },
-        "gemma-4-31b-free": {
-          "name": "Gemma 4 31B :free",
-          "modelID": "google/gemma-4-31b-it:free",
-          "limit": {
-            "context": 262144,
-            "output": 32768
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text",
-              "image"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        },
         "free-router": {
           "name": "openrouter/free router (auto-selects a free model)",
           "modelID": "openrouter/free",
           "limit": {
             "context": 200000,
             "output": 16384
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text",
-              "image"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        }
-      }
-    },
-    // ======================================================================
-    // Novita AI — rotating $0-priced models (email/GitHub signup, no card).
-    // Key: NOVITA_API_KEY (novita.ai/settings/key-management). Base URL
-    // api.novita.ai/openai. The $0 lineup CHURNS monthly — current zero-priced
-    // ids per novita.ai/pricing (2026-11-17): "zai-org/glm-new" (193K ctx) and
-    // "apodex/apodex-1.1-mini"; find fresh ones via GET /openai/v1/models
-    // (each entry carries input_token_price_per_m / output_token_price_per_m —
-    // pick the 0/0 ones). T1 (new account) defaults ~30 RPM / 50M TPM per model.
-    "novita": {
-      "name": "Novita AI ($0 rotating models)",
-      "env": [
-        "NOVITA_API_KEY"
-      ],
-      "package": "@opencode/ai/providers/openai-compatible",
-      "settings": {
-        "baseURL": "https://api.novita.ai/openai/v1"
-      },
-      "models": {
-        "glm-new-free": {
-          "name": "GLM New ($0 rotating, 193K ctx)",
-          "modelID": "zai-org/glm-new",
-          "limit": {
-            "context": 193000,
-            "output": 32768
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        },
-        "apodex-1.1-mini-free": {
-          "name": "Apodex 1.1 Mini ($0 rotating)",
-          "modelID": "apodex/apodex-1.1-mini",
-          "limit": {
-            "context": 131072,
-            "output": 16384
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        }
-      }
-    },
-    // ======================================================================
-    // Google AI Studio / Gemini API free tier (key: GOOGLE_GENERATIVE_AI_API_KEY,
-    // aistudio.google.com, no card). Free limits are per project, unpublished;
-    // reported readings 2026-10-21: gemini-3.8-flash 5 RPM / 250K TPM / 20 RPD,
-    // flash-lite 15 RPM / 500 RPD, gemma-4 30 RPM / 14,400 RPD.
-    // PRIVACY: free-tier prompts are used to improve Google products — never point
-    // these at the confidential repo contents.
-    "google": {
-      "name": "Google Gemini API (free tier)",
-      "env": [
-        "GOOGLE_GENERATIVE_AI_API_KEY"
-      ],
-      "models": {
-        "gemini-3.8-flash": {
-          "name": "Gemini 3.8 Flash (free: 5 RPM / 20 RPD)",
-          "modelID": "gemini-3.8-flash",
-          "limit": {
-            "context": 1048576,
-            "output": 65536
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text",
-              "image"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        },
-        "gemini-3.5-flash-lite": {
-          "name": "Gemini 3.5 Flash-Lite (free: 15 RPM / 500 RPD)",
-          "modelID": "gemini-3.5-flash-lite",
-          "limit": {
-            "context": 1048576,
-            "output": 8192
-          },
-          "capabilities": {
-            "tools": true,
-            "input": [
-              "text",
-              "image"
-            ],
-            "output": [
-              "text"
-            ]
-          }
-        },
-        "gemma-4": {
-          "name": "Gemma 4 (free: 30 RPM / 14,400 RPD)",
-          "modelID": "gemma-4",
-          "limit": {
-            "context": 262144,
-            "output": 8192
           },
           "capabilities": {
             "tools": true,
@@ -643,20 +246,6 @@
         "codemode": false,
         "timeout": { "startup": 120000, "catalog": 30000, "execution": 120000 }
       },
-      // kroki: 29+ diagram engines via kroki.io; sources NOT stored (privacy policy 2026-10-25, logs <30d) — still prefer mermaid-local for confidential content
-      "kroki": {
-        "type": "local",
-        "command": ["npx", "-y", "kroki-mcp"],
-        "codemode": false,
-        "timeout": { "startup": 120000, "catalog": 30000, "execution": 120000 }
-      },
-      // quickchart: chart.js -> PNG/SVG via quickchart.io; free URLs are PUBLIC — public data only
-      "quickchart": {
-        "type": "local",
-        "command": ["npx", "-y", "@gongrzhe/quickchart-mcp-server"],
-        "codemode": false,
-        "timeout": { "startup": 120000, "catalog": 30000, "execution": 120000 }
-      },
       // excalidraw: local .excalidraw file CRUD + SVG/PNG export — fully local, confidential OK
       "excalidraw": {
         "type": "local",
@@ -677,32 +266,13 @@
         "codemode": false,
         "timeout": { "startup": 240000, "catalog": 60000, "execution": 120000 }
       },
-      // ---- env-gated OSINT/reputation MCPs: flip "disabled" to false when you have the free key ----
-      // KNOWN ISSUE (diagnosed live 2026-11-18): both packages read the API key at process
-      // startup and FATAL-exit when it is missing ("SHODAN_API_KEY environment variable is
-      // required." / "VIRUSTOTAL_API_KEY ... required"), so enabling them without a key in
-      // the env makes the MCP server error out instead of connecting. That is why they stay
-      // disabled until you export a free signup key (shodan.io / virustotal.com) — then run
-      // `export SHODAN_API_KEY=... VIRUSTOTAL_API_KEY=...`, set "disabled": false, reload.
-      "shodan": {
-        "type": "local",
-        "command": ["npx", "-y", "@burtthecoder/mcp-shodan@1.0.41"],
-        "environment": { "SHODAN_API_KEY": "{env:SHODAN_API_KEY}" },
-        "disabled": true,
-        "codemode": false
-      },
-      "virustotal": {
-        "type": "local",
-        "command": ["npx", "-y", "@burtthecoder/mcp-virustotal@1.0.40"],
-        "environment": { "VIRUSTOTAL_API_KEY": "{env:VIRUSTOTAL_API_KEY}" },
-        "disabled": true,
-        "codemode": false
-      },
       // ---- Canva remote MCP: per-user OAuth, no API key ----
       // https://mcp.canva.com/mcp — first use triggers browser consent; complete it with
       // `opencode mcp auth canva`. Canva tools can MODIFY real designs -> allowed only for
       // orchestrator + designer (global deny below; per-agent allows in agents/*.md).
+      // OFF by default: needs a Canva account and can change real designs. Set "enabled": true to use it.
       "canva": {
+        "enabled": false,
         "type": "remote",
         "url": "https://mcp.canva.com/mcp",
         "oauth": false,
@@ -713,24 +283,12 @@
           "execution": 180000
         }
       },
-      // ---- Playwright Workspaces remote MCP (Microsoft) — TEMPLATE, disabled ----
-      // Needs an Azure Playwright Workspace (Entra ID app or workspace API token) — not
-      // available on this box. To enable: create a workspace at
-      // https://playwright.microsoft.com, then fill in {region} + {workspaceId} below and
-      // either OAuth via `opencode mcp auth playwright-workspace` (Entra ID) or add
-      // "headers": { "x-api-key": "{env:PLAYWRIGHT_WORKSPACE_API_KEY}" }.
-      // URL shape: https://{region}.mcp.playwright.microsoft.com/playwrightworkspaces/{workspaceId}/mcp
-      "playwright-workspace": {
+      // Keyless web search/fetch as a second route when the built-in websearch is unavailable (anonymous rate limits).
+      "parallel": {
         "type": "remote",
-        "url": "https://eastus.mcp.playwright.microsoft.com/playwrightworkspaces/YOUR_WORKSPACE_ID/mcp",
-        "headers": { "x-api-key": "{env:PLAYWRIGHT_WORKSPACE_API_KEY}" },
-        "disabled": true,
+        "url": "https://mcp.parallel.ai/mcp",
         "codemode": false,
-        "timeout": {
-          "startup": 60000,
-          "catalog": 90000,
-          "execution": 300000
-        }
+        "timeout": {"startup": 60000, "catalog": 60000, "execution": 120000}
       },
       "playwright": {
         "type": "local",
@@ -774,17 +332,6 @@
           "catalog": 60000,
           "execution": 300000
         }
-      },
-      "github": {
-        "type": "remote",
-        "url": "https://api.githubcopilot.com/mcp/",
-        "disabled": true,
-        "codemode": false,
-        "timeout": {
-          "startup": 60000,
-          "catalog": 90000,
-          "execution": 120000
-        }
       }
     }
   },
@@ -800,8 +347,7 @@
     "subagent_depth": 1,
     "background_compaction": true,
     // default model for the experimental_image_generate tool: OpenRouter :free image model
-    // (grok-imagine-image-2.0 on Zen returned "Invalid credential" live 2026-11-17).
-    // Privacy: OpenRouter free-tier hosts may train on prompts -> PUBLIC / non-confidential only.
+    // (needs OPENROUTER_API_KEY). Free-tier hosts may train on prompts -> PUBLIC prompts only.
     "image_generate": {
       "model": "openrouter/recraft/recraft-v4.1-flash-v2:free"
     }
@@ -829,22 +375,17 @@
     {"action": "playwright_*", "resource": "*", "effect": "deny"},
     {"action": "context7_*", "resource": "*", "effect": "deny"},
     {"action": "deepwiki_*", "resource": "*", "effect": "deny"},
-    // visuals + security MCPs: denied globally, re-allowed per agent (orchestrator/designer/sec/re/researcher)
-    {"action": "kroki_*", "resource": "*", "effect": "deny"},
+    // visuals + security MCPs: denied globally, re-allowed per agent (orchestrator/designer/sec/researcher)
     {"action": "mermaid_*", "resource": "*", "effect": "deny"},
-    {"action": "quickchart_*", "resource": "*", "effect": "deny"},
     {"action": "excalidraw_*", "resource": "*", "effect": "deny"},
     // (nvd_*/osv_* MCP entries removed 2026-11-17 — those servers need Node>=24; CVE/OSV lookup is via ~/.local/bin/cve and ~/.local/bin/osvq shell helpers now)
     {"action": "mitre_*", "resource": "*", "effect": "deny"},
+    {"action": "parallel_*", "resource": "*", "effect": "deny"},
     {"action": "experimental_image_generate", "resource": "*", "effect": "deny"},
     {"action": "memory_*", "resource": "*", "effect": "deny"},
     {"action": "thinking_*", "resource": "*", "effect": "deny"},
     {"action": "devtools_*", "resource": "*", "effect": "deny"},
     {"action": "canva_*", "resource": "*", "effect": "deny"},
-    {"action": "playwright_workspace_*", "resource": "*", "effect": "deny"},
-    {"action": "shodan_*", "resource": "*", "effect": "deny"},
-    {"action": "virustotal_*", "resource": "*", "effect": "deny"},
-    {"action": "github_*", "resource": "*", "effect": "ask"},
     {"action": "external_directory", "resource": "*", "effect": "ask"},
     {"action": "read", "resource": "*/.ssh/*", "effect": "deny"},
     {"action": "edit", "resource": "*/.ssh/*", "effect": "deny"},

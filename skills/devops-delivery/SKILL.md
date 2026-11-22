@@ -1,5 +1,5 @@
 ---
-name: "DevOps and Delivery"
+name: devops-delivery
 description: "Use for Dockerfiles, CI/CD pipelines, infrastructure as code, Kubernetes manifests, deployment, observability and release safety. Validate with dry runs; never apply to real environments without approval."
 ---
 

@@ -1,5 +1,5 @@
 ---
-name: "Load and Performance Testing"
+name: load-testing
 description: "Use for benchmarks, load tests, capacity planning and performance bottleneck analysis of services and functions on localhost, staging or lab systems."
 ---
 
